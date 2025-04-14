@@ -1,0 +1,382 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Advanced Network Animation</title>
+    <style>
+        body {
+            margin: 0;
+            overflow: hidden;
+            background-color: #050505;
+            font-family: 'Arial', sans-serif;
+        }
+        canvas {
+            display: block;
+        }
+        .overlay {
+            position: absolute;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            text-align: center;
+            color: white;
+            text-shadow: 0 0 10px rgba(255, 0, 0, 0.8);
+            z-index: 10;
+            pointer-events: none;
+        }
+        h1 {
+            font-size: 3rem;
+            margin-bottom: 1rem;
+            font-weight: bold;
+            letter-spacing: 2px;
+        }
+        p {
+            font-size: 1.2rem;
+            max-width: 600px;
+            margin: 0 auto;
+            opacity: 0.8;
+        }
+    </style>
+</head>
+<body>
+    <canvas id="networkCanvas"></canvas>
+    <script>
+        const canvas = document.getElementById('networkCanvas');
+        const ctx = canvas.getContext('2d');
+        
+        // Set canvas to full window size
+        canvas.width = window.innerWidth;
+        canvas.height = window.innerHeight;
+        
+        // Colors
+        const RED = "#ff0000";
+        const WHITE = "#ffffff";
+        const BLUE = "#00a2ff";
+        
+        // Network node class
+        class Node {
+            constructor(x, y, type = "normal") {
+                this.x = x;
+                this.y = y;
+                this.targetX = x + (Math.random() - 0.5) * 100;
+                this.targetY = y + (Math.random() - 0.5) * 100;
+                this.vx = 0;
+                this.vy = 0;
+                this.radius = type === "server" ? 8 : Math.random() * 3 + 1;
+                this.type = type;
+                this.color = type === "server" ? RED : (Math.random() > 0.8 ? RED : WHITE);
+                this.pulseRadius = this.radius;
+                this.pulseDirection = 1;
+                this.pulseSpeed = Math.random() * 0.05 + 0.02;
+                this.connections = [];
+                this.particles = [];
+            }
+            
+            draw() {
+                // Glow effect
+                const glow = ctx.createRadialGradient(
+                    this.x, this.y, 0,
+                    this.x, this.y, this.radius * 5
+                );
+                glow.addColorStop(0, this.type === "server" ? "rgba(255, 0, 0, 0.8)" : "rgba(255, 255, 255, 0.8)");
+                glow.addColorStop(1, "rgba(0, 0, 0, 0)");
+                
+                ctx.beginPath();
+                ctx.arc(this.x, this.y, this.radius * 1.5, 0, Math.PI * 2);
+                ctx.fillStyle = glow;
+                ctx.fill();
+                
+                // Draw the node
+                ctx.beginPath();
+                ctx.arc(this.x, this.y, this.radius, 0, Math.PI * 2);
+                ctx.fillStyle = this.color;
+                ctx.fill();
+                
+                // Pulse effect for servers
+                if (this.type === "server") {
+                    ctx.beginPath();
+                    ctx.arc(this.x, this.y, this.pulseRadius, 0, Math.PI * 2);
+                    ctx.strokeStyle = `rgba(255, 0, 0, ${1 - this.pulseRadius / 30})`;
+                    ctx.lineWidth = 2;
+                    ctx.stroke();
+                    
+                    this.pulseRadius += this.pulseDirection * this.pulseSpeed;
+                    
+                    if (this.pulseRadius > 30) {
+                        this.pulseRadius = this.radius;
+                    }
+                }
+            }
+            
+            update() {
+                // Move towards target with easing
+                this.vx = (this.targetX - this.x) * 0.01;
+                this.vy = (this.targetY - this.y) * 0.01;
+                
+                this.x += this.vx;
+                this.y += this.vy;
+                
+                // Change target after reaching close enough
+                if (Math.abs(this.x - this.targetX) < 1 && Math.abs(this.y - this.targetY) < 1) {
+                    this.targetX = this.x + (Math.random() - 0.5) * 100;
+                    this.targetY = this.y + (Math.random() - 0.5) * 100;
+                    
+                    // Keep targets within bounds
+                    this.targetX = Math.max(50, Math.min(canvas.width - 50, this.targetX));
+                    this.targetY = Math.max(50, Math.min(canvas.height - 50, this.targetY));
+                }
+                
+                // Update particles
+                for (let i = this.particles.length - 1; i >= 0; i--) {
+                    this.particles[i].update();
+                    if (this.particles[i].alpha <= 0) {
+                        this.particles.splice(i, 1);
+                    }
+                }
+            }
+            
+            sendPacket(targetNode) {
+                // Create a data packet
+                const packet = new DataPacket(this, targetNode);
+                packets.push(packet);
+            }
+        }
+        
+        // Data packet class (moving along connections)
+        class DataPacket {
+            constructor(source, target) {
+                this.source = source;
+                this.target = target;
+                this.x = source.x;
+                this.y = source.y;
+                this.progress = 0;
+                this.speed = Math.random() * 0.02 + 0.01;
+                this.size = Math.random() * 3 + 2;
+                this.color = source.type === "server" || Math.random() > 0.9 ? RED : BLUE;
+                this.trail = [];
+                this.maxTrailLength = 10;
+            }
+            
+            draw() {
+                // Draw trail
+                for (let i = 0; i < this.trail.length; i++) {
+                    const opacity = i / this.trail.length * 0.5;
+                    ctx.beginPath();
+                    ctx.arc(this.trail[i].x, this.trail[i].y, this.size * 0.7, 0, Math.PI * 2);
+                    ctx.fillStyle = `rgba(${this.color === RED ? '255, 0, 0' : '0, 162, 255'}, ${opacity})`;
+                    ctx.fill();
+                }
+                
+                // Draw packet
+                ctx.beginPath();
+                ctx.arc(this.x, this.y, this.size, 0, Math.PI * 2);
+                ctx.fillStyle = this.color;
+                ctx.fill();
+                
+                // Glow effect
+                const glow = ctx.createRadialGradient(
+                    this.x, this.y, 0,
+                    this.x, this.y, this.size * 3
+                );
+                glow.addColorStop(0, this.color === RED ? "rgba(255, 0, 0, 0.6)" : "rgba(0, 162, 255, 0.6)");
+                glow.addColorStop(1, "rgba(0, 0, 0, 0)");
+                
+                ctx.beginPath();
+                ctx.arc(this.x, this.y, this.size * 2, 0, Math.PI * 2);
+                ctx.fillStyle = glow;
+                ctx.fill();
+            }
+            
+            update() {
+                // Update progress along the path
+                this.progress += this.speed;
+                
+                // Calculate position
+                this.x = this.source.x + (this.target.x - this.source.x) * this.progress;
+                this.y = this.source.y + (this.target.y - this.source.y) * this.progress;
+                
+                // Update trail
+                this.trail.push({x: this.x, y: this.y});
+                if (this.trail.length > this.maxTrailLength) {
+                    this.trail.shift();
+                }
+                
+                // Create particles occasionally
+                if (Math.random() > 0.9) {
+                    particles.push(new Particle(this.x, this.y, this.color));
+                }
+                
+                // Check if packet reached target
+                if (this.progress >= 1) {
+                    this.target.particles.push(new Particle(this.target.x, this.target.y, this.color, 2));
+                    return true;
+                }
+                
+                return false;
+            }
+        }
+        
+        // Particle effect class
+        class Particle {
+            constructor(x, y, color, sizeFactor = 1) {
+                this.x = x;
+                this.y = y;
+                this.vx = (Math.random() - 0.5) * 2;
+                this.vy = (Math.random() - 0.5) * 2;
+                this.radius = Math.random() * 2 * sizeFactor;
+                this.alpha = 1;
+                this.color = color;
+                this.fadeRate = Math.random() * 0.05 + 0.01;
+            }
+            
+            draw() {
+                ctx.save();
+                ctx.globalAlpha = this.alpha;
+                ctx.beginPath();
+                ctx.arc(this.x, this.y, this.radius, 0, Math.PI * 2);
+                ctx.fillStyle = this.color;
+                ctx.fill();
+                ctx.restore();
+            }
+            
+            update() {
+                this.x += this.vx;
+                this.y += this.vy;
+                this.alpha -= this.fadeRate;
+            }
+        }
+        
+        // Setup nodes
+        const nodeCount = 50;
+        const nodes = [];
+        const packets = [];
+        const particles = [];
+        
+        // Create a few server nodes
+        const serverCount = 3;
+        for (let i = 0; i < serverCount; i++) {
+            const x = Math.random() * (canvas.width - 200) + 100;
+            const y = Math.random() * (canvas.height - 200) + 100;
+            nodes.push(new Node(x, y, "server"));
+        }
+        
+        // Create regular nodes
+        for (let i = 0; i < nodeCount; i++) {
+            const x = Math.random() * canvas.width;
+            const y = Math.random() * canvas.height;
+            nodes.push(new Node(x, y));
+        }
+        
+        // Create connections between nodes
+        nodes.forEach(node => {
+            // Connect every node to 2-5 other nodes
+            const connectionCount = Math.floor(Math.random() * 3) + 2;
+            
+            for (let i = 0; i < connectionCount; i++) {
+                // Find a random node to connect to
+                const targetIndex = Math.floor(Math.random() * nodes.length);
+                if (nodes[targetIndex] !== node && !node.connections.includes(nodes[targetIndex])) {
+                    node.connections.push(nodes[targetIndex]);
+                }
+            }
+            
+            // Ensure all nodes connect to at least one server
+            if (node.type !== "server") {
+                const servers = nodes.filter(n => n.type === "server");
+                const randomServer = servers[Math.floor(Math.random() * servers.length)];
+                if (!node.connections.includes(randomServer)) {
+                    node.connections.push(randomServer);
+                }
+            }
+        });
+        
+        // Draw connections between nodes
+        function drawConnections() {
+            nodes.forEach(node => {
+                node.connections.forEach(targetNode => {
+                    const dx = node.x - targetNode.x;
+                    const dy = node.y - targetNode.y;
+                    const distance = Math.sqrt(dx * dx + dy * dy);
+                    
+                    ctx.beginPath();
+                    ctx.moveTo(node.x, node.y);
+                    ctx.lineTo(targetNode.x, targetNode.y);
+                    ctx.strokeStyle = `rgba(255, 255, 255, ${0.1 - distance / 2000})`;
+                    ctx.lineWidth = 0.5;
+                    ctx.stroke();
+                });
+            });
+        }
+        
+        // Create packets randomly
+        function createRandomPackets() {
+            if (Math.random() > 0.98) {
+                const sourceNode = nodes[Math.floor(Math.random() * nodes.length)];
+                const targetNode = sourceNode.connections[Math.floor(Math.random() * sourceNode.connections.length)];
+                
+                if (targetNode) {
+                    sourceNode.sendPacket(targetNode);
+                }
+            }
+            
+            // Create more packets from servers
+            if (Math.random() > 0.95) {
+                const servers = nodes.filter(n => n.type === "server");
+                const sourceServer = servers[Math.floor(Math.random() * servers.length)];
+                const targetNode = nodes[Math.floor(Math.random() * nodes.length)];
+                
+                if (targetNode !== sourceServer) {
+                    sourceServer.sendPacket(targetNode);
+                }
+            }
+        }
+        
+        // Animation loop
+        function animate() {
+            ctx.clearRect(0, 0, canvas.width, canvas.height);
+            
+            // Create random packets
+            createRandomPackets();
+            
+            // Draw connections first (lowest layer)
+            drawConnections();
+            
+            // Update and draw particles
+            for (let i = particles.length - 1; i >= 0; i--) {
+                particles[i].draw();
+                particles[i].update();
+                
+                if (particles[i].alpha <= 0) {
+                    particles.splice(i, 1);
+                }
+            }
+            
+            // Update and draw packets
+            for (let i = packets.length - 1; i >= 0; i--) {
+                packets[i].draw();
+                if (packets[i].update()) {
+                    packets.splice(i, 1);
+                }
+            }
+            
+            // Draw and update each node (top layer)
+            nodes.forEach(node => {
+                node.draw();
+                node.update();
+            });
+            
+            requestAnimationFrame(animate);
+        }
+        
+        // Handle window resize
+        window.addEventListener('resize', () => {
+            canvas.width = window.innerWidth;
+            canvas.height = window.innerHeight;
+        });
+        
+        // Start animation
+        animate();
+    </script>
+</body>
+</html> 

@@ -1,0 +1,354 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>CyberShield Background</title>
+    <style>
+        html, body {
+            margin: 0;
+            padding: 0;
+            overflow: hidden;
+            background-color: #080808;
+            width: 100%;
+            height: 100%;
+        }
+        canvas {
+            display: block;
+            position: absolute;
+            width: 100%;
+            height: 100%;
+        }
+    </style>
+</head>
+<body>
+    <canvas id="backgroundCanvas"></canvas>
+    <script>
+        const canvas = document.getElementById('backgroundCanvas');
+        const ctx = canvas.getContext('2d');
+        
+        // Set canvas to full window size with pixel ratio for better quality
+        const pixelRatio = window.devicePixelRatio || 1;
+        canvas.width = window.innerWidth * pixelRatio;
+        canvas.height = window.innerHeight * pixelRatio;
+        canvas.style.width = window.innerWidth + 'px';
+        canvas.style.height = window.innerHeight + 'px';
+        ctx.scale(pixelRatio, pixelRatio);
+        
+        // Colors
+        const RED = "#ff0000";
+        const DARK_RED = "#990000";
+        const WHITE = "#ffffff";
+        const BLUE = "#0055ff";
+        
+        // Grid class for cyber background
+        class Grid {
+            constructor() {
+                this.spacing = 30;
+                this.points = [];
+                this.gridLines = [];
+                this.initGrid();
+                
+                // Random points that will move across the grid
+                this.particles = [];
+                for (let i = 0; i < 30; i++) {
+                    this.particles.push({
+                        x: Math.random() * canvas.width / pixelRatio,
+                        y: Math.random() * canvas.height / pixelRatio,
+                        radius: Math.random() * 2 + 1,
+                        color: Math.random() > 0.7 ? RED : WHITE,
+                        speed: Math.random() * 1.5 + 0.5,
+                        angle: Math.random() * Math.PI * 2
+                    });
+                }
+            }
+            
+            initGrid() {
+                // Create grid points
+                const cols = Math.ceil(canvas.width / pixelRatio / this.spacing) + 1;
+                const rows = Math.ceil(canvas.height / pixelRatio / this.spacing) + 1;
+                
+                for (let i = 0; i < cols; i++) {
+                    for (let j = 0; j < rows; j++) {
+                        this.points.push({
+                            x: i * this.spacing,
+                            y: j * this.spacing,
+                            intensity: 0,
+                            baseIntensity: Math.random() * 0.3
+                        });
+                    }
+                }
+            }
+            
+            update() {
+                // Update particles
+                this.particles.forEach(particle => {
+                    particle.x += Math.cos(particle.angle) * particle.speed;
+                    particle.y += Math.sin(particle.angle) * particle.speed;
+                    
+                    // Wrap around screen
+                    if (particle.x < 0) particle.x = canvas.width / pixelRatio;
+                    if (particle.x > canvas.width / pixelRatio) particle.x = 0;
+                    if (particle.y < 0) particle.y = canvas.height / pixelRatio;
+                    if (particle.y > canvas.height / pixelRatio) particle.y = 0;
+                    
+                    // Random angle change
+                    if (Math.random() > 0.99) {
+                        particle.angle += (Math.random() * 0.5 - 0.25);
+                    }
+                });
+                
+                // Update grid point intensities based on particles
+                this.points.forEach(point => {
+                    point.intensity = point.baseIntensity;
+                    
+                    this.particles.forEach(particle => {
+                        const dx = point.x - particle.x;
+                        const dy = point.y - particle.y;
+                        const distance = Math.sqrt(dx * dx + dy * dy);
+                        
+                        if (distance < 60) {
+                            point.intensity += (1 - distance / 60) * 0.5;
+                        }
+                    });
+                });
+            }
+            
+            draw() {
+                // Draw grid lines
+                ctx.strokeStyle = 'rgba(255, 0, 0, 0.05)';
+                ctx.lineWidth = 0.5;
+                
+                const cols = Math.ceil(canvas.width / pixelRatio / this.spacing);
+                const rows = Math.ceil(canvas.height / pixelRatio / this.spacing);
+                
+                // Vertical lines
+                for (let i = 0; i <= cols; i++) {
+                    const x = i * this.spacing;
+                    ctx.beginPath();
+                    ctx.moveTo(x, 0);
+                    ctx.lineTo(x, canvas.height / pixelRatio);
+                    ctx.stroke();
+                }
+                
+                // Horizontal lines
+                for (let i = 0; i <= rows; i++) {
+                    const y = i * this.spacing;
+                    ctx.beginPath();
+                    ctx.moveTo(0, y);
+                    ctx.lineTo(canvas.width / pixelRatio, y);
+                    ctx.stroke();
+                }
+                
+                // Draw grid points with glow based on intensity
+                this.points.forEach(point => {
+                    if (point.intensity > 0.1) {
+                        // Draw glow
+                        const glow = ctx.createRadialGradient(
+                            point.x, point.y, 0,
+                            point.x, point.y, 8
+                        );
+                        glow.addColorStop(0, `rgba(255, 0, 0, ${point.intensity * 0.4})`);
+                        glow.addColorStop(1, 'rgba(0, 0, 0, 0)');
+                        
+                        ctx.beginPath();
+                        ctx.fillStyle = glow;
+                        ctx.arc(point.x, point.y, 8, 0, Math.PI * 2);
+                        ctx.fill();
+                        
+                        // Draw point
+                        ctx.beginPath();
+                        ctx.fillStyle = `rgba(255, ${Math.floor(255 * (1 - point.intensity))}, ${Math.floor(255 * (1 - point.intensity))}, ${0.3 + point.intensity * 0.7})`;
+                        ctx.arc(point.x, point.y, 1.5, 0, Math.PI * 2);
+                        ctx.fill();
+                    }
+                });
+                
+                // Draw particles
+                this.particles.forEach(particle => {
+                    // Glow effect
+                    const glow = ctx.createRadialGradient(
+                        particle.x, particle.y, 0,
+                        particle.x, particle.y, particle.radius * 4
+                    );
+                    glow.addColorStop(0, particle.color === RED ? "rgba(255, 0, 0, 0.8)" : "rgba(255, 255, 255, 0.8)");
+                    glow.addColorStop(1, "rgba(0, 0, 0, 0)");
+                    
+                    ctx.beginPath();
+                    ctx.fillStyle = glow;
+                    ctx.arc(particle.x, particle.y, particle.radius * 4, 0, Math.PI * 2);
+                    ctx.fill();
+                    
+                    // Particle
+                    ctx.beginPath();
+                    ctx.fillStyle = particle.color;
+                    ctx.arc(particle.x, particle.y, particle.radius, 0, Math.PI * 2);
+                    ctx.fill();
+                    
+                    // Draw trail
+                    const trail = ctx.createLinearGradient(
+                        particle.x, particle.y,
+                        particle.x - Math.cos(particle.angle) * 20, 
+                        particle.y - Math.sin(particle.angle) * 20
+                    );
+                    trail.addColorStop(0, particle.color === RED ? "rgba(255, 0, 0, 0.8)" : "rgba(255, 255, 255, 0.8)");
+                    trail.addColorStop(1, "rgba(0, 0, 0, 0)");
+                    
+                    ctx.beginPath();
+                    ctx.strokeStyle = trail;
+                    ctx.lineWidth = particle.radius;
+                    ctx.moveTo(particle.x, particle.y);
+                    ctx.lineTo(
+                        particle.x - Math.cos(particle.angle) * 20,
+                        particle.y - Math.sin(particle.angle) * 20
+                    );
+                    ctx.stroke();
+                });
+            }
+        }
+        
+        // Binary patterns display
+        class BinaryPatterns {
+            constructor() {
+                this.patterns = [];
+                this.generatePatterns();
+                this.interval = setInterval(() => this.generatePatterns(), 5000);
+            }
+            
+            generatePatterns() {
+                this.patterns = [];
+                const patternCount = Math.floor(Math.random() * 5) + 3;
+                
+                for (let i = 0; i < patternCount; i++) {
+                    const x = Math.random() * (canvas.width / pixelRatio);
+                    const y = Math.random() * (canvas.height / pixelRatio);
+                    const width = Math.random() * 150 + 50;
+                    const height = Math.random() * 80 + 40;
+                    const alpha = Math.random() * 0.15 + 0.05;
+                    
+                    this.patterns.push({
+                        x, y, width, height, alpha,
+                        columns: Math.floor(width / 10),
+                        rows: Math.floor(height / 15),
+                        chars: []
+                    });
+                    
+                    // Generate binary characters
+                    for (let col = 0; col < this.patterns[i].columns; col++) {
+                        for (let row = 0; row < this.patterns[i].rows; row++) {
+                            this.patterns[i].chars.push({
+                                value: Math.random() > 0.5 ? '1' : '0',
+                                x: this.patterns[i].x + col * 10,
+                                y: this.patterns[i].y + row * 15,
+                                alpha: Math.random() * 0.7 + 0.3,
+                                isRed: Math.random() > 0.85
+                            });
+                        }
+                    }
+                }
+            }
+            
+            update() {
+                // Randomly change some characters
+                this.patterns.forEach(pattern => {
+                    pattern.chars.forEach(char => {
+                        if (Math.random() > 0.95) {
+                            char.value = Math.random() > 0.5 ? '1' : '0';
+                            char.alpha = Math.random() * 0.7 + 0.3;
+                            char.isRed = Math.random() > 0.85;
+                        }
+                    });
+                });
+            }
+            
+            draw() {
+                ctx.font = '10px monospace';
+                
+                this.patterns.forEach(pattern => {
+                    pattern.chars.forEach(char => {
+                        ctx.fillStyle = char.isRed ? 
+                            `rgba(255, 0, 0, ${char.alpha * pattern.alpha})` : 
+                            `rgba(255, 255, 255, ${char.alpha * pattern.alpha})`;
+                        ctx.fillText(char.value, char.x, char.y);
+                    });
+                });
+            }
+            
+            destroy() {
+                clearInterval(this.interval);
+            }
+        }
+        
+        // Initialize elements
+        const grid = new Grid();
+        const binaryPatterns = new BinaryPatterns();
+        
+        // Animation loop
+        function animate() {
+            // Clear with slight blur effect to create a glow trail
+            ctx.fillStyle = 'rgba(8, 8, 8, 0.1)';
+            ctx.fillRect(0, 0, canvas.width, canvas.height);
+            
+            // Update and draw elements
+            grid.update();
+            grid.draw();
+            
+            binaryPatterns.update();
+            binaryPatterns.draw();
+            
+            requestAnimationFrame(animate);
+        }
+        
+        // Add scanner lines that move across screen occasionally
+        setInterval(() => {
+            const isHorizontal = Math.random() > 0.5;
+            const position = isHorizontal ? 
+                Math.random() * (canvas.height / pixelRatio) : 
+                Math.random() * (canvas.width / pixelRatio);
+            const speed = Math.random() * 2 + 1;
+            
+            let currentPos = isHorizontal ? 0 : 0;
+            const maxPos = isHorizontal ? (canvas.width / pixelRatio) : (canvas.height / pixelRatio);
+            
+            const scanInterval = setInterval(() => {
+                if (currentPos >= maxPos) {
+                    clearInterval(scanInterval);
+                    return;
+                }
+                
+                currentPos += speed;
+                
+                ctx.strokeStyle = 'rgba(255, 0, 0, 0.8)';
+                ctx.lineWidth = 1;
+                ctx.beginPath();
+                
+                if (isHorizontal) {
+                    ctx.moveTo(currentPos, position - 10);
+                    ctx.lineTo(currentPos, position + 10);
+                } else {
+                    ctx.moveTo(position - 10, currentPos);
+                    ctx.lineTo(position + 10, currentPos);
+                }
+                
+                ctx.stroke();
+            }, 16);
+        }, 8000);
+        
+        // Handle window resize
+        window.addEventListener('resize', () => {
+            // Update canvas size
+            canvas.width = window.innerWidth * pixelRatio;
+            canvas.height = window.innerHeight * pixelRatio;
+            canvas.style.width = window.innerWidth + 'px';
+            canvas.style.height = window.innerHeight + 'px';
+            ctx.scale(pixelRatio, pixelRatio);
+            
+            // Reinitialize grid for new size
+            grid.initGrid();
+        });
+        
+        // Start animation
+        animate();
+    </script>
+</body>
+</html> 

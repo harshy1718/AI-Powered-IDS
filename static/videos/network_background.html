@@ -1,0 +1,397 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Network Background Animation</title>
+    <style>
+        html, body {
+            margin: 0;
+            padding: 0;
+            overflow: hidden;
+            background-color: #0a0a0a; /* Slightly lighter black */
+            width: 100%;
+            height: 100%;
+        }
+        canvas {
+            display: block;
+            position: absolute;
+            width: 100%;
+            height: 100%;
+        }
+    </style>
+</head>
+<body>
+    <canvas id="networkCanvas"></canvas>
+    <script>
+        const canvas = document.getElementById('networkCanvas');
+        const ctx = canvas.getContext('2d');
+        
+        // Set canvas to full window size with pixel ratio for better quality
+        const pixelRatio = window.devicePixelRatio || 1;
+        canvas.width = window.innerWidth * pixelRatio;
+        canvas.height = window.innerHeight * pixelRatio;
+        canvas.style.width = window.innerWidth + 'px';
+        canvas.style.height = window.innerHeight + 'px';
+        ctx.scale(pixelRatio, pixelRatio);
+        
+        // Colors with higher intensity
+        const RED = "#ff0000";
+        const BRIGHT_RED = "#ff3333";
+        const WHITE = "#ffffff";
+        const BLUE = "#00a2ff";
+        
+        // Network node class
+        class Node {
+            constructor(x, y, type = "normal") {
+                this.x = x;
+                this.y = y;
+                this.targetX = x + (Math.random() - 0.5) * 150;
+                this.targetY = y + (Math.random() - 0.5) * 150;
+                this.vx = 0;
+                this.vy = 0;
+                this.radius = type === "server" ? 10 : Math.random() * 4 + 2; // Slightly larger nodes
+                this.type = type;
+                this.color = type === "server" ? BRIGHT_RED : (Math.random() > 0.7 ? RED : WHITE);
+                this.pulseRadius = this.radius;
+                this.pulseDirection = 1;
+                this.pulseSpeed = Math.random() * 0.08 + 0.03; // Faster pulse
+                this.connections = [];
+                this.particles = [];
+            }
+            
+            draw() {
+                // Glow effect - brighter and larger
+                const glow = ctx.createRadialGradient(
+                    this.x, this.y, 0,
+                    this.x, this.y, this.radius * 8
+                );
+                glow.addColorStop(0, this.type === "server" ? "rgba(255, 0, 0, 0.9)" : "rgba(255, 255, 255, 0.9)");
+                glow.addColorStop(1, "rgba(0, 0, 0, 0)");
+                
+                ctx.beginPath();
+                ctx.arc(this.x, this.y, this.radius * 2, 0, Math.PI * 2);
+                ctx.fillStyle = glow;
+                ctx.fill();
+                
+                // Draw the node with stronger color
+                ctx.beginPath();
+                ctx.arc(this.x, this.y, this.radius, 0, Math.PI * 2);
+                ctx.fillStyle = this.color;
+                ctx.fill();
+                
+                // Pulse effect for servers - more visible
+                if (this.type === "server") {
+                    ctx.beginPath();
+                    ctx.arc(this.x, this.y, this.pulseRadius, 0, Math.PI * 2);
+                    ctx.strokeStyle = `rgba(255, 0, 0, ${1 - this.pulseRadius / 40})`;
+                    ctx.lineWidth = 3;
+                    ctx.stroke();
+                    
+                    this.pulseRadius += this.pulseDirection * this.pulseSpeed;
+                    
+                    if (this.pulseRadius > 40) {
+                        this.pulseRadius = this.radius;
+                    }
+                }
+            }
+            
+            update() {
+                // Move towards target with easing
+                this.vx = (this.targetX - this.x) * 0.015;
+                this.vy = (this.targetY - this.y) * 0.015;
+                
+                this.x += this.vx;
+                this.y += this.vy;
+                
+                // Change target after reaching close enough
+                if (Math.abs(this.x - this.targetX) < 1 && Math.abs(this.y - this.targetY) < 1) {
+                    this.targetX = this.x + (Math.random() - 0.5) * 150;
+                    this.targetY = this.y + (Math.random() - 0.5) * 150;
+                    
+                    // Keep targets within bounds
+                    this.targetX = Math.max(50, Math.min(canvas.width / pixelRatio - 50, this.targetX));
+                    this.targetY = Math.max(50, Math.min(canvas.height / pixelRatio - 50, this.targetY));
+                }
+                
+                // Update particles
+                for (let i = this.particles.length - 1; i >= 0; i--) {
+                    this.particles[i].update();
+                    if (this.particles[i].alpha <= 0) {
+                        this.particles.splice(i, 1);
+                    }
+                }
+            }
+            
+            sendPacket(targetNode) {
+                // Create a data packet
+                const packet = new DataPacket(this, targetNode);
+                packets.push(packet);
+            }
+        }
+        
+        // Data packet class (moving along connections) - brighter and more visible
+        class DataPacket {
+            constructor(source, target) {
+                this.source = source;
+                this.target = target;
+                this.x = source.x;
+                this.y = source.y;
+                this.progress = 0;
+                this.speed = Math.random() * 0.03 + 0.015; // Faster packets
+                this.size = Math.random() * 4 + 3; // Larger packets
+                this.color = source.type === "server" || Math.random() > 0.9 ? RED : BLUE;
+                this.trail = [];
+                this.maxTrailLength = 12; // Longer trail
+            }
+            
+            draw() {
+                // Draw trail with more opacity
+                for (let i = 0; i < this.trail.length; i++) {
+                    const opacity = i / this.trail.length * 0.7;
+                    ctx.beginPath();
+                    ctx.arc(this.trail[i].x, this.trail[i].y, this.size * 0.7, 0, Math.PI * 2);
+                    ctx.fillStyle = `rgba(${this.color === RED ? '255, 0, 0' : '0, 162, 255'}, ${opacity})`;
+                    ctx.fill();
+                }
+                
+                // Draw packet with brighter glow
+                ctx.beginPath();
+                ctx.arc(this.x, this.y, this.size, 0, Math.PI * 2);
+                ctx.fillStyle = this.color;
+                ctx.fill();
+                
+                // Glow effect - stronger
+                const glow = ctx.createRadialGradient(
+                    this.x, this.y, 0,
+                    this.x, this.y, this.size * 4
+                );
+                glow.addColorStop(0, this.color === RED ? "rgba(255, 0, 0, 0.8)" : "rgba(0, 162, 255, 0.8)");
+                glow.addColorStop(1, "rgba(0, 0, 0, 0)");
+                
+                ctx.beginPath();
+                ctx.arc(this.x, this.y, this.size * 3, 0, Math.PI * 2);
+                ctx.fillStyle = glow;
+                ctx.fill();
+            }
+            
+            update() {
+                // Update progress along the path
+                this.progress += this.speed;
+                
+                // Calculate position
+                this.x = this.source.x + (this.target.x - this.source.x) * this.progress;
+                this.y = this.source.y + (this.target.y - this.source.y) * this.progress;
+                
+                // Update trail
+                this.trail.push({x: this.x, y: this.y});
+                if (this.trail.length > this.maxTrailLength) {
+                    this.trail.shift();
+                }
+                
+                // Create particles more frequently
+                if (Math.random() > 0.8) {
+                    particles.push(new Particle(this.x, this.y, this.color));
+                }
+                
+                // Check if packet reached target
+                if (this.progress >= 1) {
+                    this.target.particles.push(new Particle(this.target.x, this.target.y, this.color, 3));
+                    return true;
+                }
+                
+                return false;
+            }
+        }
+        
+        // Particle effect class - brighter and more visible
+        class Particle {
+            constructor(x, y, color, sizeFactor = 1) {
+                this.x = x;
+                this.y = y;
+                this.vx = (Math.random() - 0.5) * 2.5;
+                this.vy = (Math.random() - 0.5) * 2.5;
+                this.radius = Math.random() * 3 * sizeFactor;
+                this.alpha = 1;
+                this.color = color;
+                this.fadeRate = Math.random() * 0.03 + 0.01; // Slower fade
+            }
+            
+            draw() {
+                ctx.save();
+                ctx.globalAlpha = this.alpha;
+                ctx.beginPath();
+                ctx.arc(this.x, this.y, this.radius, 0, Math.PI * 2);
+                ctx.fillStyle = this.color;
+                ctx.fill();
+                
+                // Add glow
+                const glow = ctx.createRadialGradient(
+                    this.x, this.y, 0,
+                    this.x, this.y, this.radius * 3
+                );
+                glow.addColorStop(0, this.color === RED ? `rgba(255, 0, 0, ${this.alpha})` : `rgba(255, 255, 255, ${this.alpha})`);
+                glow.addColorStop(1, "rgba(0, 0, 0, 0)");
+                
+                ctx.beginPath();
+                ctx.arc(this.x, this.y, this.radius * 3, 0, Math.PI * 2);
+                ctx.fillStyle = glow;
+                ctx.fill();
+                
+                ctx.restore();
+            }
+            
+            update() {
+                this.x += this.vx;
+                this.y += this.vy;
+                this.alpha -= this.fadeRate;
+            }
+        }
+        
+        // Setup nodes - more nodes for a denser network
+        const nodeCount = 80;
+        const nodes = [];
+        const packets = [];
+        const particles = [];
+        
+        // Create more server nodes
+        const serverCount = 5;
+        for (let i = 0; i < serverCount; i++) {
+            const x = Math.random() * (canvas.width / pixelRatio - 200) + 100;
+            const y = Math.random() * (canvas.height / pixelRatio - 200) + 100;
+            nodes.push(new Node(x, y, "server"));
+        }
+        
+        // Create regular nodes
+        for (let i = 0; i < nodeCount; i++) {
+            const x = Math.random() * (canvas.width / pixelRatio);
+            const y = Math.random() * (canvas.height / pixelRatio);
+            nodes.push(new Node(x, y));
+        }
+        
+        // Create connections between nodes - more connections for visual density
+        nodes.forEach(node => {
+            // Connect every node to 3-7 other nodes
+            const connectionCount = Math.floor(Math.random() * 4) + 3;
+            
+            for (let i = 0; i < connectionCount; i++) {
+                // Find a random node to connect to
+                const targetIndex = Math.floor(Math.random() * nodes.length);
+                if (nodes[targetIndex] !== node && !node.connections.includes(nodes[targetIndex])) {
+                    node.connections.push(nodes[targetIndex]);
+                }
+            }
+            
+            // Ensure all nodes connect to at least one server
+            if (node.type !== "server") {
+                const servers = nodes.filter(n => n.type === "server");
+                const randomServer = servers[Math.floor(Math.random() * servers.length)];
+                if (!node.connections.includes(randomServer)) {
+                    node.connections.push(randomServer);
+                }
+            }
+        });
+        
+        // Draw connections between nodes - brighter connections
+        function drawConnections() {
+            nodes.forEach(node => {
+                node.connections.forEach(targetNode => {
+                    const dx = node.x - targetNode.x;
+                    const dy = node.y - targetNode.y;
+                    const distance = Math.sqrt(dx * dx + dy * dy);
+                    
+                    // Create gradient for connection
+                    const gradient = ctx.createLinearGradient(node.x, node.y, targetNode.x, targetNode.y);
+                    
+                    if (node.type === "server" || targetNode.type === "server") {
+                        gradient.addColorStop(0, "rgba(255, 0, 0, 0.3)");
+                        gradient.addColorStop(1, "rgba(255, 255, 255, 0.1)");
+                    } else {
+                        gradient.addColorStop(0, "rgba(255, 255, 255, 0.2)");
+                        gradient.addColorStop(1, "rgba(255, 255, 255, 0.1)");
+                    }
+                    
+                    ctx.beginPath();
+                    ctx.moveTo(node.x, node.y);
+                    ctx.lineTo(targetNode.x, targetNode.y);
+                    ctx.strokeStyle = gradient;
+                    ctx.lineWidth = node.type === "server" || targetNode.type === "server" ? 1.5 : 0.8;
+                    ctx.stroke();
+                });
+            });
+        }
+        
+        // Create packets more frequently 
+        function createRandomPackets() {
+            if (Math.random() > 0.95) {
+                const sourceNode = nodes[Math.floor(Math.random() * nodes.length)];
+                const targetNode = sourceNode.connections[Math.floor(Math.random() * sourceNode.connections.length)];
+                
+                if (targetNode) {
+                    sourceNode.sendPacket(targetNode);
+                }
+            }
+            
+            // Create more packets from servers
+            if (Math.random() > 0.9) {
+                const servers = nodes.filter(n => n.type === "server");
+                const sourceServer = servers[Math.floor(Math.random() * servers.length)];
+                const targetNode = nodes[Math.floor(Math.random() * nodes.length)];
+                
+                if (targetNode !== sourceServer) {
+                    sourceServer.sendPacket(targetNode);
+                }
+            }
+        }
+        
+        // Animation loop
+        function animate() {
+            ctx.clearRect(0, 0, canvas.width, canvas.height);
+            
+            // Create random packets
+            createRandomPackets();
+            
+            // Draw connections first (lowest layer)
+            drawConnections();
+            
+            // Update and draw particles
+            for (let i = particles.length - 1; i >= 0; i--) {
+                particles[i].draw();
+                particles[i].update();
+                
+                if (particles[i].alpha <= 0) {
+                    particles.splice(i, 1);
+                }
+            }
+            
+            // Update and draw packets
+            for (let i = packets.length - 1; i >= 0; i--) {
+                packets[i].draw();
+                if (packets[i].update()) {
+                    packets.splice(i, 1);
+                }
+            }
+            
+            // Draw and update each node (top layer)
+            nodes.forEach(node => {
+                node.draw();
+                node.update();
+            });
+            
+            requestAnimationFrame(animate);
+        }
+        
+        // Handle window resize
+        window.addEventListener('resize', () => {
+            canvas.width = window.innerWidth * pixelRatio;
+            canvas.height = window.innerHeight * pixelRatio;
+            canvas.style.width = window.innerWidth + 'px';
+            canvas.style.height = window.innerHeight + 'px';
+            ctx.scale(pixelRatio, pixelRatio);
+        });
+        
+        // Start animation
+        animate();
+    </script>
+</body>
+</html> 

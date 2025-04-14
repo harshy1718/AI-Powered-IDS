@@ -1,0 +1,399 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Neural Network Animation</title>
+    <style>
+        body {
+            margin: 0;
+            overflow: hidden;
+            background-color: #0a0a0a;
+            font-family: 'Arial', sans-serif;
+        }
+        canvas {
+            display: block;
+        }
+        .overlay {
+            position: absolute;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            text-align: center;
+            color: white;
+            text-shadow: 0 0 10px rgba(255, 0, 0, 0.8);
+            z-index: 10;
+            pointer-events: none;
+        }
+        h1 {
+            font-size: 3rem;
+            margin-bottom: 1rem;
+            font-weight: bold;
+            letter-spacing: 2px;
+        }
+        p {
+            font-size: 1.2rem;
+            max-width: 600px;
+            margin: 0 auto;
+            opacity: 0.8;
+        }
+    </style>
+</head>
+<body>
+    <canvas id="neuralCanvas"></canvas>
+    <div class="overlay">
+        <h1>Advanced Network Threat Detection</h1>
+        <p>Our machine learning algorithms continuously monitor network traffic to identify and neutralize potential threats in real-time</p>
+    </div>
+    <script>
+        const canvas = document.getElementById('neuralCanvas');
+        const ctx = canvas.getContext('2d');
+        
+        // Set canvas to full window size
+        canvas.width = window.innerWidth;
+        canvas.height = window.innerHeight;
+        
+        // Colors
+        const RED = "#ff0000";
+        const WHITE = "#ffffff";
+        const LIGHT_RED = "#ff6666";
+        
+        // Neural network class
+        class NeuralNetwork {
+            constructor() {
+                this.layers = [];
+                this.signals = [];
+                
+                // Define neural network architecture (input, hidden, output layers)
+                const inputNeurons = 10;
+                const hiddenLayers = 3;
+                const neuronsPerHiddenLayer = 8;
+                const outputNeurons = 5;
+                
+                // Calculate spacing
+                const xSpacing = canvas.width / (hiddenLayers + 2);
+                
+                // Input layer
+                const inputLayer = [];
+                for (let i = 0; i < inputNeurons; i++) {
+                    const y = (canvas.height / (inputNeurons + 1)) * (i + 1);
+                    inputLayer.push(new Neuron(xSpacing, y));
+                }
+                this.layers.push(inputLayer);
+                
+                // Hidden layers
+                for (let l = 0; l < hiddenLayers; l++) {
+                    const hiddenLayer = [];
+                    for (let i = 0; i < neuronsPerHiddenLayer; i++) {
+                        const y = (canvas.height / (neuronsPerHiddenLayer + 1)) * (i + 1);
+                        hiddenLayer.push(new Neuron(xSpacing * (l + 2), y));
+                    }
+                    this.layers.push(hiddenLayer);
+                }
+                
+                // Output layer
+                const outputLayer = [];
+                for (let i = 0; i < outputNeurons; i++) {
+                    const y = (canvas.height / (outputNeurons + 1)) * (i + 1);
+                    outputLayer.push(new Neuron(xSpacing * (hiddenLayers + 2), y, true));
+                }
+                this.layers.push(outputLayer);
+                
+                // Label each output neuron
+                this.outputLabels = ["DoS Attack", "Probe Attack", "R2L Attack", "U2R Attack", "Normal"];
+            }
+            
+            draw() {
+                // Draw connections first
+                this.drawConnections();
+                
+                // Draw neurons
+                for (let l = 0; l < this.layers.length; l++) {
+                    for (let n = 0; n < this.layers[l].length; n++) {
+                        this.layers[l][n].draw();
+                    }
+                }
+                
+                // Draw signals
+                for (let i = this.signals.length - 1; i >= 0; i--) {
+                    this.signals[i].draw();
+                    this.signals[i].update();
+                    
+                    if (this.signals[i].progress >= 1) {
+                        // Target neuron activation animation
+                        const targetNeuron = this.signals[i].targetNeuron;
+                        targetNeuron.activate();
+                        
+                        // If signal reaches a neuron that isn't in output layer, generate new signals
+                        for (let l = 0; l < this.layers.length; l++) {
+                            if (this.layers[l].includes(targetNeuron) && l < this.layers.length - 1) {
+                                // Create signals to next layer
+                                this.createSignalsFromNeuron(targetNeuron, this.layers[l + 1]);
+                                break;
+                            }
+                        }
+                        
+                        // Remove signal
+                        this.signals.splice(i, 1);
+                    }
+                }
+                
+                // Draw output labels
+                this.drawOutputLabels();
+            }
+            
+            drawConnections() {
+                ctx.strokeStyle = "rgba(255, 255, 255, 0.05)";
+                ctx.lineWidth = 0.5;
+                
+                for (let l = 0; l < this.layers.length - 1; l++) {
+                    const currentLayer = this.layers[l];
+                    const nextLayer = this.layers[l + 1];
+                    
+                    for (let n1 = 0; n1 < currentLayer.length; n1++) {
+                        for (let n2 = 0; n2 < nextLayer.length; n2++) {
+                            ctx.beginPath();
+                            ctx.moveTo(currentLayer[n1].x, currentLayer[n1].y);
+                            ctx.lineTo(nextLayer[n2].x, nextLayer[n2].y);
+                            ctx.stroke();
+                        }
+                    }
+                }
+            }
+            
+            drawOutputLabels() {
+                const outputLayer = this.layers[this.layers.length - 1];
+                
+                ctx.font = "14px Arial";
+                ctx.fillStyle = WHITE;
+                ctx.textAlign = "left";
+                
+                for (let i = 0; i < outputLayer.length; i++) {
+                    const neuron = outputLayer[i];
+                    ctx.fillText(this.outputLabels[i], neuron.x + 20, neuron.y + 5);
+                }
+            }
+            
+            createRandomSignal() {
+                // Pick a random input neuron
+                const inputLayer = this.layers[0];
+                const randomInputIndex = Math.floor(Math.random() * inputLayer.length);
+                const inputNeuron = inputLayer[randomInputIndex];
+                
+                // Activate this neuron
+                inputNeuron.activate();
+                
+                // Create signals to the next layer
+                this.createSignalsFromNeuron(inputNeuron, this.layers[1]);
+            }
+            
+            createSignalsFromNeuron(sourceNeuron, targetLayer) {
+                // Create 1-3 random connections from this neuron to the next layer
+                const connectionCount = Math.floor(Math.random() * 3) + 1;
+                
+                for (let i = 0; i < connectionCount; i++) {
+                    const randomTargetIndex = Math.floor(Math.random() * targetLayer.length);
+                    const targetNeuron = targetLayer[randomTargetIndex];
+                    
+                    // Create a signal
+                    this.signals.push(new Signal(sourceNeuron, targetNeuron));
+                }
+            }
+            
+            update() {
+                // Randomly create new signals from input layer
+                if (Math.random() > 0.97) {
+                    this.createRandomSignal();
+                }
+                
+                // Update all neurons
+                for (let l = 0; l < this.layers.length; l++) {
+                    for (let n = 0; n < this.layers[l].length; n++) {
+                        this.layers[l][n].update();
+                    }
+                }
+            }
+        }
+        
+        // Neuron class
+        class Neuron {
+            constructor(x, y, isOutput = false) {
+                this.x = x;
+                this.y = y;
+                this.radius = isOutput ? 10 : 6;
+                this.isOutput = isOutput;
+                this.color = WHITE;
+                this.pulseRadius = 0;
+                this.pulseAlpha = 0;
+                this.activated = false;
+                this.activationIntensity = 0;
+            }
+            
+            draw() {
+                // Glow effect
+                if (this.activationIntensity > 0) {
+                    const glow = ctx.createRadialGradient(
+                        this.x, this.y, 0,
+                        this.x, this.y, this.radius * 3
+                    );
+                    
+                    if (this.isOutput) {
+                        glow.addColorStop(0, `rgba(255, 0, 0, ${this.activationIntensity})`);
+                    } else {
+                        glow.addColorStop(0, `rgba(255, 255, 255, ${this.activationIntensity})`);
+                    }
+                    
+                    glow.addColorStop(1, "rgba(0, 0, 0, 0)");
+                    
+                    ctx.beginPath();
+                    ctx.arc(this.x, this.y, this.radius * 3, 0, Math.PI * 2);
+                    ctx.fillStyle = glow;
+                    ctx.fill();
+                }
+                
+                // Draw neuron
+                ctx.beginPath();
+                ctx.arc(this.x, this.y, this.radius, 0, Math.PI * 2);
+                
+                if (this.isOutput) {
+                    ctx.fillStyle = this.activationIntensity > 0.5 ? RED : LIGHT_RED;
+                } else {
+                    const intensity = Math.max(0.3, this.activationIntensity);
+                    ctx.fillStyle = `rgba(255, 255, 255, ${intensity})`;
+                }
+                
+                ctx.fill();
+                
+                // Draw pulse effect if activated
+                if (this.pulseRadius > 0) {
+                    ctx.beginPath();
+                    ctx.arc(this.x, this.y, this.pulseRadius, 0, Math.PI * 2);
+                    ctx.strokeStyle = this.isOutput ? 
+                        `rgba(255, 0, 0, ${this.pulseAlpha})` : 
+                        `rgba(255, 255, 255, ${this.pulseAlpha})`;
+                    ctx.lineWidth = 2;
+                    ctx.stroke();
+                }
+            }
+            
+            update() {
+                // Update activation intensity (fade out)
+                if (this.activationIntensity > 0) {
+                    this.activationIntensity -= 0.01;
+                    if (this.activationIntensity < 0) {
+                        this.activationIntensity = 0;
+                    }
+                }
+                
+                // Update pulse effect
+                if (this.pulseRadius > 0) {
+                    this.pulseRadius += 2;
+                    this.pulseAlpha -= 0.02;
+                    
+                    if (this.pulseAlpha <= 0) {
+                        this.pulseRadius = 0;
+                        this.pulseAlpha = 0;
+                    }
+                }
+            }
+            
+            activate() {
+                this.activationIntensity = 1;
+                this.pulseRadius = this.radius * 2;
+                this.pulseAlpha = 0.8;
+            }
+        }
+        
+        // Signal class (moving along connections)
+        class Signal {
+            constructor(sourceNeuron, targetNeuron) {
+                this.sourceNeuron = sourceNeuron;
+                this.targetNeuron = targetNeuron;
+                this.x = sourceNeuron.x;
+                this.y = sourceNeuron.y;
+                this.progress = 0;
+                this.speed = Math.random() * 0.02 + 0.01;
+                this.size = 3;
+                this.color = sourceNeuron.isOutput ? RED : WHITE;
+                this.trail = [];
+                this.maxTrailLength = 5;
+            }
+            
+            draw() {
+                // Draw trail
+                for (let i = 0; i < this.trail.length; i++) {
+                    const opacity = i / this.trail.length * 0.5;
+                    ctx.beginPath();
+                    ctx.arc(this.trail[i].x, this.trail[i].y, this.size * 0.7, 0, Math.PI * 2);
+                    ctx.fillStyle = this.sourceNeuron.isOutput ? 
+                        `rgba(255, 0, 0, ${opacity})` : 
+                        `rgba(255, 255, 255, ${opacity})`;
+                    ctx.fill();
+                }
+                
+                // Draw signal
+                ctx.beginPath();
+                ctx.arc(this.x, this.y, this.size, 0, Math.PI * 2);
+                ctx.fillStyle = this.color;
+                ctx.fill();
+                
+                // Glow effect
+                const glow = ctx.createRadialGradient(
+                    this.x, this.y, 0,
+                    this.x, this.y, this.size * 3
+                );
+                
+                glow.addColorStop(0, this.sourceNeuron.isOutput ? 
+                    "rgba(255, 0, 0, 0.6)" : 
+                    "rgba(255, 255, 255, 0.6)");
+                glow.addColorStop(1, "rgba(0, 0, 0, 0)");
+                
+                ctx.beginPath();
+                ctx.arc(this.x, this.y, this.size * 2, 0, Math.PI * 2);
+                ctx.fillStyle = glow;
+                ctx.fill();
+            }
+            
+            update() {
+                // Update progress along the path
+                this.progress += this.speed;
+                
+                // Calculate position
+                this.x = this.sourceNeuron.x + (this.targetNeuron.x - this.sourceNeuron.x) * this.progress;
+                this.y = this.sourceNeuron.y + (this.targetNeuron.y - this.sourceNeuron.y) * this.progress;
+                
+                // Update trail
+                this.trail.push({x: this.x, y: this.y});
+                if (this.trail.length > this.maxTrailLength) {
+                    this.trail.shift();
+                }
+                
+                return this.progress;
+            }
+        }
+        
+        // Create neural network
+        const neuralNetwork = new NeuralNetwork();
+        
+        // Animation loop
+        function animate() {
+            ctx.clearRect(0, 0, canvas.width, canvas.height);
+            
+            // Draw and update neural network
+            neuralNetwork.draw();
+            neuralNetwork.update();
+            
+            requestAnimationFrame(animate);
+        }
+        
+        // Handle window resize
+        window.addEventListener('resize', () => {
+            canvas.width = window.innerWidth;
+            canvas.height = window.innerHeight;
+        });
+        
+        // Start animation
+        animate();
+    </script>
+</body>
+</html> 

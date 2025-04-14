@@ -1,0 +1,278 @@
+{% extends 'base.html' %}
+{% load static %}
+
+{% block content %}
+<div class="dashboard-container animate__animated animate__fadeIn">
+    <div class="dashboard-header">
+        <h1 class="text-center mb-4"><i class="fas fa-shield-alt"></i> Intrusion Detection System Dashboard</h1>
+        <p class="text-center">Real-time insights into network security status and threat detection</p>
+    </div>
+
+    <div class="video-container">
+        <iframe src="{% static 'videos/network_background.html' %}" frameborder="0" class="video-bg" allow="autoplay" scrolling="no" allowtransparency="true"></iframe>
+        <div class="video-overlay">
+            <h2>Advanced Network Threat Detection</h2>
+            <p>Our machine learning algorithms continuously monitor network traffic to identify and neutralize potential threats in real-time</p>
+        </div>
+    </div>
+
+    <div class="row mt-4">
+        <div class="col-md-6 mb-4">
+            <div class="card dashboard-card animate__animated animate__fadeInLeft">
+                <div class="card-header">
+                    <h5><i class="fas fa-network-wired"></i> Protocol Distribution</h5>
+                </div>
+                <div class="card-body">
+                    <canvas id="protocolChart" height="250"></canvas>
+                </div>
+            </div>
+        </div>
+
+        <div class="col-md-6 mb-4">
+            <div class="card dashboard-card animate__animated animate__fadeInRight">
+                <div class="card-header">
+                    <h5><i class="fas fa-bug"></i> Attack Type Distribution</h5>
+                </div>
+                <div class="card-body">
+                    <canvas id="attackChart" height="250"></canvas>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <div class="row">
+        <div class="col-md-4 mb-4">
+            <div class="card dashboard-card counter-card animate__animated animate__fadeInUp">
+                <div class="card-body text-center">
+                    <i class="fas fa-shield-virus fa-3x mb-3"></i>
+                    <h5>Total Attacks Detected</h5>
+                    <div class="counter" data-count="{{ attack_count }}">0</div>
+                </div>
+            </div>
+        </div>
+
+        <div class="col-md-4 mb-4">
+            <div class="card dashboard-card counter-card animate__animated animate__fadeInUp" data-wow-delay="0.2s">
+                <div class="card-body text-center">
+                    <i class="fas fa-brain fa-3x mb-3"></i>
+                    <h5>Model Training Score</h5>
+                    <div class="counter" data-count="{{ model_training_score }}">0</div>
+                    <span class="percent-sign">%</span>
+                </div>
+            </div>
+        </div>
+
+        <div class="col-md-4 mb-4">
+            <div class="card dashboard-card counter-card animate__animated animate__fadeInUp" data-wow-delay="0.4s">
+                <div class="card-body text-center">
+                    <i class="fas fa-vial fa-3x mb-3"></i>
+                    <h5>Model Testing Score</h5>
+                    <div class="counter" data-count="{{ model_testing_score }}">0</div>
+                    <span class="percent-sign">%</span>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <div class="row">
+        <div class="col-12 text-center mt-5 mb-5">
+            <a href="{% url 'detection' %}" class="btn btn-lg start-detection-btn animate__animated animate__pulse animate__infinite">
+                <i class="fas fa-play-circle me-2"></i> Start Detection
+            </a>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block extra_scripts %}
+<script>
+    const protocolData = JSON.parse('{{ protocol_data|escapejs }}');
+    const attackData = JSON.parse('{{ attack_data|escapejs }}');
+
+    document.addEventListener('DOMContentLoaded', function() {
+        const protocolCtx = document.getElementById('protocolChart').getContext('2d');
+        new Chart(protocolCtx, {
+            type: 'bar',
+            data: {
+                labels: protocolData.labels,
+                datasets: [{
+                    label: 'Occurrences',
+                    data: protocolData.values,
+                    backgroundColor: [
+                        'rgba(255, 0, 0, 0.9)',
+                        'rgba(255, 99, 132, 0.9)',
+                        'rgba(255, 159, 64, 0.9)',
+                        'rgba(255, 206, 86, 0.9)'
+                    ],
+                    borderColor: [
+                        'rgba(255, 0, 0, 1)',
+                        'rgba(255, 99, 132, 1)',
+                        'rgba(255, 159, 64, 1)',
+                        'rgba(255, 206, 86, 1)'
+                    ],
+                    borderWidth: 2,
+                    hoverBackgroundColor: [
+                        'rgba(255, 0, 0, 1)',
+                        'rgba(255, 99, 132, 1)',
+                        'rgba(255, 159, 64, 1)',
+                        'rgba(255, 206, 86, 1)'
+                    ]
+                }]
+            },
+            options: {
+                responsive: true,
+                maintainAspectRatio: true,
+                aspectRatio: 2,
+                scales: {
+                    y: {
+                        beginAtZero: true,
+                        grid: {
+                            color: 'rgba(255, 255, 255, 0.1)'
+                        },
+                        ticks: {
+                            color: 'rgba(255, 255, 255, 0.8)',
+                            font: {
+                                size: 12,
+                                weight: 'bold'
+                            }
+                        }
+                    },
+                    x: {
+                        grid: {
+                            color: 'rgba(255, 255, 255, 0.1)'
+                        },
+                        ticks: {
+                            color: 'rgba(255, 255, 255, 0.8)',
+                            font: {
+                                size: 12,
+                                weight: 'bold'
+                            }
+                        }
+                    }
+                },
+                plugins: {
+                    legend: {
+                        labels: {
+                            color: 'rgba(255, 255, 255, 0.8)',
+                            font: {
+                                size: 14,
+                                weight: 'bold'
+                            }
+                        }
+                    },
+                    tooltip: {
+                        backgroundColor: 'rgba(0, 0, 0, 0.8)',
+                        titleColor: '#ff0000',
+                        bodyColor: '#fff',
+                        titleFont: {
+                            size: 16,
+                            weight: 'bold'
+                        },
+                        bodyFont: {
+                            size: 14
+                        },
+                        borderColor: '#ff0000',
+                        borderWidth: 1
+                    }
+                }
+            }
+        });
+
+        const attackCtx = document.getElementById('attackChart').getContext('2d');
+        new Chart(attackCtx, {
+            type: 'doughnut',
+            data: {
+                labels: attackData.labels,
+                datasets: [{
+                    data: attackData.values,
+                    backgroundColor: [
+                        'rgba(255, 0, 0, 0.9)',
+                        'rgba(255, 99, 132, 0.9)',
+                        'rgba(54, 162, 235, 0.9)',
+                        'rgba(153, 102, 255, 0.9)',
+                        'rgba(75, 192, 192, 0.9)'
+                    ],
+                    borderColor: [
+                        'rgba(255, 0, 0, 1)',
+                        'rgba(255, 99, 132, 1)',
+                        'rgba(54, 162, 235, 1)',
+                        'rgba(153, 102, 255, 1)',
+                        'rgba(75, 192, 192, 1)'
+                    ],
+                    borderWidth: 2,
+                    hoverBackgroundColor: [
+                        'rgba(255, 0, 0, 1)',
+                        'rgba(255, 99, 132, 1)',
+                        'rgba(54, 162, 235, 1)',
+                        'rgba(153, 102, 255, 1)',
+                        'rgba(75, 192, 192, 1)'
+                    ]
+                }]
+            },
+            options: {
+                responsive: true,
+                maintainAspectRatio: true,
+                aspectRatio: 1.5,
+                plugins: {
+                    legend: {
+                        position: 'right',
+                        labels: {
+                            color: 'rgba(255, 255, 255, 0.8)',
+                            font: {
+                                size: 14,
+                                weight: 'bold'
+                            },
+                            padding: 20
+                        }
+                    },
+                    tooltip: {
+                        backgroundColor: 'rgba(0, 0, 0, 0.8)',
+                        titleColor: '#ff0000',
+                        bodyColor: '#fff',
+                        titleFont: {
+                            size: 16,
+                            weight: 'bold'
+                        },
+                        bodyFont: {
+                            size: 14
+                        },
+                        borderColor: '#ff0000',
+                        borderWidth: 1
+                    }
+                }
+            }
+        });
+
+        document.querySelectorAll('.counter').forEach(counter => {
+            const target = +counter.getAttribute('data-count');
+            const duration = 2500; 
+            const steps = 60;
+            const stepValue = target / steps;
+            let current = 0;
+            
+            const timer = setInterval(() => {
+                current += stepValue;
+                if (current > target) {
+                    clearInterval(timer);
+                    counter.textContent = Number.isInteger(target) ? target : target.toFixed(1);
+                } else {
+                    counter.textContent = Number.isInteger(current) ? Math.floor(current) : current.toFixed(1);
+                }
+            }, duration / steps);
+        });
+    });
+
+    anime({
+        targets: '.start-detection-btn',
+        scale: [1, 1.05, 1],
+        boxShadow: [
+            '0 8px 20px rgba(255, 0, 0, 0.4)',
+            '0 12px 30px rgba(255, 0, 0, 0.7)',
+            '0 8px 20px rgba(255, 0, 0, 0.4)'
+        ],
+        duration: 2000,
+        loop: true,
+        easing: 'easeInOutQuad'
+    });
+</script>
+{% endblock %} 
